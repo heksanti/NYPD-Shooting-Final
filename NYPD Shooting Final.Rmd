@@ -1,0 +1,108 @@
+---
+title: "NYPD_Shooting_Data"
+author: "Hector Santillan"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---  
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r setup_packages, include=TRUE}
+library(readr)
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+```
+
+## NYPD Shooting Data (historic)
+
+This is an analysis of the NYPD shooting historical data. the data has been obtained from www.Data.gov. 
+
+```{r nypd_read, echo=TRUE}
+x <- read_csv('https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD')
+x
+summary(x)
+```
+## Transform/Clean
+
+The data was transformed and cleaned to show only the variables that are important to our analysis.
+
+```{r nypd_clean, echo=TRUE}
+nypd <- x %>%
+rename(
+date_full = OCCUR_DATE,
+time = OCCUR_TIME,
+borough = BORO,
+precinct = PRECINCT,
+jurisdiction_code = JURISDICTION_CODE,
+statistical_murder = STATISTICAL_MURDER_FLAG,
+vic_age = VIC_AGE_GROUP,
+vic_sex = VIC_SEX,
+vic_race = VIC_RACE) %>%
+mutate(date = mdy(date_full)) %>%
+separate(date, into =c("year", "month", "day")) %>%
+select(-c(X_COORD_CD, Y_COORD_CD, Latitude, Longitude, Lon_Lat, INCIDENT_KEY, LOCATION_DESC, PERP_AGE_GROUP, PERP_SEX, PERP_RACE))
+nypd
+summary(nypd)
+```
+## Plots
+
+I am very interested to see the number of shootings by month. Are there months where shootings are greater? statistically significantly greater?
+
+```{r nypd_plots, echo=TRUE}
+plot <- ggplot(data = nypd) +
+geom_bar(mapping = aes(x = month, fill = borough), position = "dodge")
+plot + theme(axis.text = element_text(size = rel(0.5)))
+
+plot <- ggplot(data = nypd) +
+geom_bar(mapping = aes(x = month, fill = vic_race), position = "dodge")
+plot + theme(axis.text = element_text(size = rel(0.5)))
+
+plot <- ggplot(data = nypd) +
+geom_bar(mapping = aes(x = month, fill = vic_sex), position = "dodge")
+plot + theme(axis.text = element_text(size = rel(0.5)))
+
+plot <- ggplot(data = nypd) +
+geom_bar(mapping = aes(x = month, fill = vic_age), position = "dodge")
+plot + theme(axis.text = element_text(size = rel(0.5)))
+
+shootings_vs_deaths <- nypd %>%
+group_by(borough, month) %>%
+mutate(shootings = n(), deaths = sum(statistical_murder)) %>%
+select(borough, shootings, statistical_murder, deaths, month, date_full) %>%
+ungroup() %>%
+summarize(borough, month, shootings, statistical_murder, deaths, date_full)
+
+plot <- ggplot(data = shootings_vs_deaths) +
+geom_bar(mapping = aes(x = month, fill = statistical_murder), position = "dodge")
+plot + theme(axis.text = element_text(size = rel(0.5)))
+```
+## Analysis
+
+Questions raised by analysis:
+  1. Why do the months of July and August have the most shootings? Deaths?
+  2. Is there a reason why the summer months tend to have the highest number of shootings?
+  3. Are shootings statistically significantly higher during certain months?
+
+## Model
+
+```{r nypd_model, echo=TRUE}
+mod <- lm(shootings ~ month, data = shootings_vs_deaths)
+summary(mod)
+```
+
+## Conclusion
+  
+Bias & Conclusion:
+
+Bias:
+I don't think that there is any significant bias from myself to have affected in any significant manner to this analysis. To be honest, I think if there is any bias it might be in the data itself. There might have been some bias by the individuals putting together or collecting the data or even in the reporting of the incidents, in such factors as gender and race. There could have been any number of actions or decisions that could have effected the categorical data in this data set.
+
+Conclusion:
+In conclusion, based on the data set, the months of July and August had the highest number of shootings. This raised the question of whether months were statistically significant predictors of shootings. After my analysis and modeling, months are a statistically significant predictor of shootings within the five boroughs of New York.
